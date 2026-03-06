@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="ml">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVCN Master - Pro Day Book Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #1b5e20;
+            --secondary: #4caf50;
+            --bg: #f4f7f6;
+            --text: #333;
+            --white: #fff;
+            --danger: #d32f2f;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { display: flex; height: 100vh; background-color: var(--bg); color: var(--text); }
+        
+        /* Sidebar */
+        .sidebar { width: 250px; background: var(--primary); color: var(--white); padding-top: 20px; display: flex; flex-direction: column; }
+        .sidebar h2 { text-align: center; margin-bottom: 20px; font-size: 1.2rem; }
+        .nav-btn { background: none; border: none; color: var(--white); padding: 15px 20px; text-align: left; cursor: pointer; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-btn:hover, .nav-btn.active { background: var(--secondary); }
+        
+        /* Main Content */
+        .main-content { flex: 1; padding: 20px; overflow-y: auto; position: relative; }
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        /* Tables & Inputs */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: var(--white); }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: var(--primary); color: var(--white); }
+        input, select, button { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { cursor: pointer; background: var(--secondary); color: var(--white); border: none; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        
+        /* Sales Dashboard Bills */
+        .bill-container { background: var(--white); padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .bill-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        
+        /* Suggestion Box (Keyboard Nav) */
+        .suggestion-box { position: absolute; background: var(--white); border: 1px solid #ccc; z-index: 100; max-height: 200px; overflow-y: auto; width: 350px; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .suggestion-item { padding: 10px; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid #eee; }
+        .suggestion-item.selected, .suggestion-item:hover { background: #c8e6c9; font-weight: bold; }
+        
+        /* Secret Area & Calendars */
+        #secret-trigger { position: absolute; bottom: 10px; right: 10px; width: 40px; height: 40px; cursor: default; background: transparent; }
+        #secret-area { display: none; margin-top: 20px; border: 2px solid var(--primary); padding: 15px; background: #e8f5e9; border-radius: 8px; }
+        
+        .calendar-container { margin-top: 20px; background: var(--white); padding: 15px; border-radius: 8px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 15px; }
+        .cal-day { border: 1px solid #ccc; padding: 10px; min-height: 100px; background: #f9f9f9; cursor: pointer; border-radius: 4px; position: relative; }
+        .cal-day:hover { background: #e0f2f1; border-color: var(--primary); }
+        .cal-date { font-weight: bold; font-size: 1.2rem; color: var(--primary); margin-bottom: 5px; }
+        .cal-data { font-size: 0.85rem; line-height: 1.4; }
+        
+        .hidden { display: none !important; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .red-text { color: var(--danger); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>SVCN Master</h2>
+        <button class="nav-btn active" onclick="showSection('sales-dashboard')">Sales Dashboard</button>
+        <button class="nav-btn" onclick="showSection('admin-panel')">Admin Panel</button>
+        <button class="nav-btn" onclick="showSection('sales-tally')">Sales to Tally</button>
+        <button class="nav-btn" onclick="showSection('stock-management')">Stock Management</button>
+        <button class="nav-btn" onclick="showSection('daybook')">Daybook</button>
+    </div>
+
+    <div class="main-content">
+        <div id="sales-dashboard" class="section active">
+            <div class="flex-between" style="margin-bottom: 20px;">
+                <button onclick="createNewBill()" style="padding: 10px 20px; font-size: 1.1rem;">+ Start New Bill</button>
+                <h2>Sales Dashboard</h2>
+            </div>
+            <div id="bills-wrapper"></div>
+        </div>
+
+        <div id="admin-panel" class="section">
+            <h2>Admin Panel</h2>
+            <div style="margin-top: 20px; padding: 15px; background: var(--white); border-radius: 8px;">
+                <h3>Data Sync (Local Storage)</h3>
+                <button onclick="exportData()">Export Data Backup</button>
+                <input type="file" id="import-data-file" accept=".json" style="display:none" onchange="importData(event)">
+                <button onclick="document.getElementById('import-data-file').click()">Import Data</button>
+            </div>
+            
+            <div id="secret-trigger" ondblclick="promptSecret()"></div>
+
+            <div id="secret-area">
+                <div class="flex-between" style="margin-bottom: 15px;">
+                    <h3>Secret Financial Monthly Calendar</h3>
+                    <div>
+                        <button onclick="changePassword()" style="background: #ff9800;">Change Password</button>
+                        <button onclick="hideSecret()" style="background: var(--danger);">Back (Hide)</button>
+                    </div>
+                </div>
+                <div class="calendar-container">
+                    <h3 id="admin-month-title" style="text-align:center; color: var(--primary);"></h3>
+                    <div id="secret-calendar" class="calendar-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="stock-management" class="section">
+            <div class="flex-between">
+                <h2>Stock Management</h2>
+                <div>
+                    <input type="file" id="import-file" accept=".xlsx, .xls" style="display:none" onchange="importStockExcel(event)">
+                    <button onclick="document.getElementById('import-file').click()">Import Excel (.xlsx)</button>
+                    <button onclick="toggleExtraMl()">Show/Hide Extra ML</button>
+                    <button onclick="saveStock()">Save Data</button>
+                </div>
+            </div>
+            <table id="stock-table">
+                <thead>
+                    <tr>
+                        <th>Medicine Name</th>
+                        <th>Quantity</th>
+                        <th>Main Unit</th>
+                        <th>Main Price</th>
+                        <th>Price 25ml</th>
+                        <th class="extra-ml-col hidden">Extra ml</th>
+                        <th>Over Entry</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="stock-tbody"></tbody>
+            </table>
+        </div>
+
+        <div id="sales-tally" class="section">
+            <h2>Sales to Tally</h2>
+            <table id="tally-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortTally('name')" style="cursor:pointer">Medicine Name ⇕</th>
+                        <th onclick="sortTally('qty')" style="cursor:pointer">Total Qty ⇕</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="tally-tbody"></tbody>
+            </table>
+        </div>
+
+        <div id="daybook" class="section">
+            <h2>Daybook Calendar</h2>
+            <div class="calendar-container">
+                <h3 id="daybook-month-title" style="text-align:center; color: var(--primary);"></h3>
+                <div id="daybook-calendar" class="calendar-grid"></div>
+            </div>
+            <div id="daybook-details" style="margin-top:20px; padding:15px; background:var(--white); border-radius:8px; display:none;"></div>
+        </div>
+    </div>
+
+    <div id="autocomplete-list" class="suggestion-box"></div>
+
+    <script>
+        // --- DATA INITIALIZATION ---
+        let appData = JSON.parse(localStorage.getItem('svcn_data')) || {
+            stock: [], bills: [], tallySummary: {}, secretDaily: {}, 
+            password: '1234', adminExpenses: {}
+        };
+        
+        let currentFocusList = [];
+        let activeSuggestionIndex = -1;
+        let todayStr = new Date().toISOString().split('T')[0];
+
+        function saveData() { localStorage.setItem('svcn_data', JSON.stringify(appData)); }
+
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.currentTarget.classList.add('active');
+            
+            if(id === 'sales-dashboard') renderBills();
+            if(id === 'stock-management') renderStock();
+            if(id === 'sales-tally') renderTallySummary();
+            if(id === 'daybook') renderDaybookCalendar();
+        }
+
+        // --- FAST SALES DASHBOARD ---
+        function createNewBill() {
+            const newBill = {
+                id: 'B' + Date.now().toString().slice(-6),
+                date: todayStr,
+                category: 'Unknown',
+                items: [{name: '', qtyStr: '', round: 0, rate: 0}],
+                total: 0
+            };
+            appData.bills.push(newBill); // Add to bottom
+            saveData();
+            renderBills();
+        }
+
+        function renderBills() {
+            const wrapper = document.getElementById('bills-wrapper');
+            wrapper.innerHTML = '';
+            // Render oldest top, newest bottom
+            appData.bills.forEach((bill, bIndex) => {
+                let html = `
+                <div class="bill-container" id="bill-card-${bIndex}">
+                    <div class="bill-header">
+                        <strong>Bill No: ${bill.id} | Date: ${bill.date}</strong>
+                        <div>
+                            <select onchange="updateBillCategory(${bIndex}, this.value)">
+                                <option value="Unknown" ${bill.category==='Unknown'?'selected':''}>Unknown</option>
+                                <option value="Cash entered" ${bill.category==='Cash entered'?'selected':''}>Cash entered</option>
+                                <option value="Bank entered" ${bill.category==='Bank entered'?'selected':''}>Bank entered</option>
+                                <option value="To bank" ${bill.category==='To bank'?'selected':''}>To bank</option>
+                                <option value="To cash" ${bill.category==='To cash'?'selected':''}>To cash</option>
+                            </select>
+                            <button onclick="deleteBill(${bIndex})" style="background:var(--danger); margin-left:10px;">Delete Bill</button>
+                        </div>
+                    </div>
+                    <table>
+                        <thead><tr><th width="5%"></th><th width="40%">Item Name</th><th width="20%">Quantity</th><th width="15%">Round Off</th><th width="20%" style="text-align:right;">Rate</th></tr></thead>
+                        <tbody id="bill-tbody-${bIndex}">`;
+                
+                bill.items.forEach((item, iIndex) => {
+                    html += generateRowHTML(bIndex, iIndex, item);
+                });
+
+                html += `</tbody></table>
+                    <div style="text-align:right; margin-top:10px; font-size:1.2em;">Total: <b id="bill-total-${bIndex}">${bill.total}</b></div>
+                </div>`;
+                wrapper.innerHTML += html;
+            });
+        }
+
+        function generateRowHTML(bIndex, iIndex, item) {
+            let stockInfo = appData.stock.find(s => s.name === item.name);
+            let nameClass = (stockInfo && stockInfo.overEntry > 0) ? 'red-text' : '';
+            let hint = stockInfo ? `<small style="float:right; color:#777;">Stk: <span id="hint-qty-${bIndex}-${iIndex}">${stockInfo.qty}</span></small>` : '';
+            return `
+                <tr id="row-${bIndex}-${iIndex}">
+                    <td><button onclick="removeRow(${bIndex}, ${iIndex})" style="background:var(--danger); padding:2px 6px;">x</button></td>
+                    <td>
+                        <input type="text" class="${nameClass}" style="width:100%;" value="${item.name}" 
+                            onkeyup="handleSearch(event, ${bIndex}, ${iIndex})" 
+                            onkeydown="handleKeydown(event, ${bIndex}, ${iIndex}, 'name')"
+                            id="item-${bIndex}-${iIndex}" autocomplete="off">
+                        ${hint}
+                    </td>
+                    <td><input type="text" style="width:100%;" value="${item.qtyStr}" 
+                            onkeydown="handleKeydown(event, ${bIndex}, ${iIndex}, 'qty')"
+                            onchange="calcRowLogic(${bIndex}, ${iIndex})"
+                            id="qty-${bIndex}-${iIndex}" autocomplete="off"></td>
+                    <td><input type="number" style="width:100%;" value="${item.round}" 
+                            onkeydown="handleKeydown(event, ${bIndex}, ${iIndex}, 'round')"
+                            onchange="calcRowLogic(${bIndex}, ${iIndex})"
+                            id="round-${bIndex}-${iIndex}"></td>
+                    <td style="text-align:right;"><b id="rate-${bIndex}-${iIndex}">${item.rate}</b></td>
+                </tr>`;
+        }
+
+        // --- FAST KEYBOARD NAVIGATION & AUTOCOMPLETE ---
+        function handleSearch(e, bIndex, iIndex) {
+            if(['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(e.key)) return;
+            
+            const input = e.target;
+            const val = input.value.toLowerCase();
+            const list = document.getElementById('autocomplete-list');
+            
+            if(!val) { list.style.display = 'none'; return; }
+
+            currentFocusList = appData.stock.filter(s => s.name.toLowerCase().includes(val));
+            if(currentFocusList.length === 0) { list.style.display = 'none'; return; }
+
+            list.innerHTML = '';
+            activeSuggestionIndex = -1;
+
+            currentFocusList.forEach((match, idx) => {
+                let div = document.createElement('div');
+                div.className = 'suggestion-item';
+                div.innerHTML = `<span>${match.name}</span> <small>${match.qty} ${match.unit}</small>`;
+                div.onclick = () => selectItem(bIndex, iIndex, match.name);
+                list.appendChild(div);
+            });
+
+            const rect = input.getBoundingClientRect();
+            list.style.left = rect.left + 'px';
+            list.style.top = (rect.bottom + window.scrollY) + 'px';
+            list.style.display = 'block';
+        }
+
+        function handleKeydown(e, bIndex, iIndex, field) {
+            const list = document.getElementById('autocomplete-list');
+            const items = list.getElementsByClassName('suggestion-item');
+
+            if (field === 'name') {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeSuggestionIndex++;
+                    if(activeSuggestionIndex >= items.length) activeSuggestionIndex = 0;
+                    highlightList(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeSuggestionIndex--;
+                    if(activeSuggestionIndex < 0) activeSuggestionIndex = items.length - 1;
+                    highlightList(items);
+                } else if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    if(list.style.display === 'block' && activeSuggestionIndex > -1) {
+                        items[activeSuggestionIndex].click();
+                    } else {
+                        calcRowLogic(bIndex, iIndex); // Apply name if typed manually
+                        document.getElementById(`qty-${bIndex}-${iIndex}`).focus();
+                    }
+                    list.style.display = 'none';
+                }
+            } else if (field === 'qty') {
+                if(e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    calcRowLogic(bIndex, iIndex);
+                    document.getElementById(`round-${bIndex}-${iIndex}`).focus();
+                }
+            } else if (field === 'round') {
+                if(e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    calcRowLogic(bIndex, iIndex);
+                    
+                    // Add new row if it's the last row
+                    if(iIndex === appData.bills[bIndex].items.length - 1) {
+                        appData.bills[bIndex].items.push({name: '', qtyStr: '', round: 0, rate: 0});
+                        let tbody = document.getElementById(`bill-tbody-${bIndex}`);
+                        let newRowHtml = generateRowHTML(bIndex, iIndex + 1, appData.bills[bIndex].items[iIndex + 1]);
+                        tbody.insertAdjacentHTML('beforeend', newRowHtml);
+                        setTimeout(() => document.getElementById(`item-${bIndex}-${iIndex+1}`).focus(), 10);
+                    } else {
+                        document.getElementById(`item-${bIndex}-${iIndex+1}`).focus();
+                    }
+                }
+            }
+        }
+
+        function highlightList(items) {
+            Array.from(items).forEach(el => el.classList.remove('selected'));
+            if(items[activeSuggestionIndex]) {
+                items[activeSuggestionIndex].classList.add('selected');
+                items[activeSuggestionIndex].scrollIntoView({block: 'nearest'});
+            }
+        }
+
+        function selectItem(bIndex, iIndex, name) {
+            document.getElementById(`item-${bIndex}-${iIndex}`).value = name;
+            document.getElementById('autocomplete-list').style.display = 'none';
+            appData.bills[bIndex].items[iIndex].name = name;
+            calcRowLogic(bIndex, iIndex);
+            setTimeout(() => document.getElementById(`qty-${bIndex}-${iIndex}`).focus(), 10);
+        }
+
+        // --- OPTIMIZED CALCULATION (NO BUFFERING) ---
+        function calcRowLogic(bIndex, iIndex) {
+            let nameVal = document.getElementById(`item-${bIndex}-${iIndex}`).value;
+            let qtyVal = document.getElementById(`qty-${bIndex}-${iIndex}`).value;
+            let roundVal = parseFloat(document.getElementById(`round-${bIndex}-${iIndex}`).value) || 0;
+
+            let itemRow = appData.bills[bIndex].items[iIndex];
+            itemRow.name = nameVal;
+            itemRow.qtyStr = qtyVal;
+            itemRow.round = roundVal;
+
+            let stockInfo = appData.stock.find(s => s.name === itemRow.name);
+            if(!stockInfo || !itemRow.qtyStr) {
+                updateBillTotalDOM(bIndex);
+                return;
+            }
+
+            let rawQty = itemRow.qtyStr.toLowerCase();
+            let calculatedRate = 0;
+            let stockDeduction = 0;
+            let profitDirect = 0;
+            let profitIndirect = 0;
+
+            if(stockInfo.unit === 'nos') {
+                let q = parseFloat(rawQty.replace(/[^0-9.]/g, '')) || 0;
+                calculatedRate = (q * stockInfo.priceMain);
+                stockDeduction = q;
+            } else {
+                // btl or ml
+                if (rawQty.includes('b') && rawQty.includes('m')) {
+                    let parts = rawQty.split('b');
+                    let btls = parseFloat(parts[0]) || 0;
+                    let mls = parseFloat(parts[1].replace('m','').replace('l','')) || 0;
+                    let totalMl = (btls * 450) + mls;
+                    calculatedRate = (stockInfo.price25ml * totalMl / 25);
+                    stockDeduction = totalMl / 450;
+                    profitDirect = calculatedRate - (stockDeduction * stockInfo.priceMain);
+                } else if (rawQty.includes('m')) {
+                    let mls = parseFloat(rawQty.replace(/[^0-9.]/g, '')) || 0;
+                    calculatedRate = (stockInfo.price25ml * mls / 25);
+                    stockDeduction = mls / 450;
+                    profitDirect = calculatedRate - (stockDeduction * stockInfo.priceMain);
+                } else {
+                    let btls = parseFloat(rawQty.replace(/[^0-9.]/g, '')) || 0;
+                    calculatedRate = (btls * stockInfo.priceMain);
+                    stockDeduction = btls;
+                    profitIndirect = (stockInfo.price25ml * stockInfo.extraMl / 25) * btls;
+                }
+            }
+
+            calculatedRate += itemRow.round;
+            itemRow.rate = Math.round(calculatedRate);
+
+            // Update specific DOM Elements instead of full reload to prevent lag
+            document.getElementById(`rate-${bIndex}-${iIndex}`).innerText = itemRow.rate;
+            
+            // Stock Update
+            stockInfo.qty -= stockDeduction;
+            let hintDOM = document.getElementById(`hint-qty-${bIndex}-${iIndex}`);
+            if(hintDOM) hintDOM.innerText = stockInfo.qty.toFixed(2);
+
+            // Tally summary
+            appData.tallySummary[itemRow.name] = (appData.tallySummary[itemRow.name] || 0) + stockDeduction;
+
+            // Profits Update
+            recordProfits(appData.bills[bIndex], profitDirect, profitIndirect, itemRow.round);
+
+            updateBillTotalDOM(bIndex);
+            
+            // Background save
+            setTimeout(() => saveData(), 100); 
+        }
+
+        function updateBillTotalDOM(bIndex) {
+            let bill = appData.bills[bIndex];
+            bill.total = bill.items.reduce((sum, it) => sum + (it.rate || 0), 0);
+            document.getElementById(`bill-total-${bIndex}`).innerText = bill.total;
+        }
+
+        function removeRow(bIndex, iIndex) {
+            appData.bills[bIndex].items.splice(iIndex, 1);
+            saveData();
+            renderBills();
+        }
+
+        function deleteBill(bIndex) {
+            if(confirm("Delete this bill?")) {
+                appData.bills.splice(bIndex, 1);
+                saveData();
+                renderBills();
+            }
+        }
+        
+        function updateBillCategory(bIndex, val) {
+            appData.bills[bIndex].category = val;
+            saveData();
+        }
+
+        // --- PROFIT RECORDING ---
+        function recordProfits(bill, dir, ind, round) {
+            let d = bill.date;
+            if(!appData.secretDaily[d]) appData.secretDaily[d] = { direct:0, indirect:0, round:0 };
+            
+            if(['Unknown', 'To bank', 'To cash'].includes(bill.category)) {
+                appData.secretDaily[d].direct += dir;
+                appData.secretDaily[d].indirect += ind;
+            }
+            if(['Cash entered', 'Bank entered', 'Unknown', 'To bank', 'To cash'].includes(bill.category)){
+                appData.secretDaily[d].round += round;
+            }
+        }
+
+        // --- ADMIN PANEL & CALENDAR ---
+        function promptSecret() {
+            let pass = prompt("Enter Secret Password:");
+            if(pass === appData.password) {
+                document.getElementById('secret-area').style.display = 'block';
+                generateAdminCalendar();
+            } else { alert("Incorrect Password!"); }
+        }
+
+        function hideSecret() { document.getElementById('secret-area').style.display = 'none'; }
+        
+        function changePassword() {
+            let old = prompt("Current password:");
+            if(old === appData.password) {
+                let newP = prompt("New password:");
+                if(newP) { appData.password = newP; saveData(); alert("Saved."); }
+            }
+        }
+
+        function generateAdminCalendar() {
+            const cal = document.getElementById('secret-calendar');
+            cal.innerHTML = '';
+            
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            document.getElementById('admin-month-title').innerText = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+            
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            // Re-calculate Opening/Closing flow
+            let runningBalance = 0;
+
+            for(let i = 1; i <= daysInMonth; i++) {
+                let dStr = `${year}-${String(month+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                let dat = appData.secretDaily[dStr] || { direct:0, indirect:0, round:0 };
+                let exp = appData.adminExpenses[dStr] || 0;
+                
+                let income = dat.direct + dat.indirect + dat.round;
+                let closing = (runningBalance + income) - exp;
+
+                cal.innerHTML += `
+                    <div class="cal-day" onclick="editExpense('${dStr}', ${exp})">
+                        <div class="cal-date">${i}</div>
+                        <div class="cal-data">
+                            Dir: ${dat.direct.toFixed(1)}<br>
+                            Ind: ${dat.indirect.toFixed(1)}<br>
+                            Rnd: ${dat.round.toFixed(1)}<br>
+                            <span class="red-text">Exp: ${exp}</span><br>
+                            <b>Bal: ${closing.toFixed(1)}</b>
+                        </div>
+                    </div>
+                `;
+                runningBalance = closing; // Carry over to next day
+            }
+        }
+
+        function editExpense(dateStr, currentExp) {
+            let exp = prompt(`Enter expenses for ${dateStr}:`, currentExp);
+            if(exp !== null && !isNaN(exp)) {
+                appData.adminExpenses[dateStr] = parseFloat(exp);
+                saveData();
+                generateAdminCalendar();
+            }
+        }
+
+        // --- DAYBOOK CALENDAR ---
+        function renderDaybookCalendar() {
+            const cal = document.getElementById('daybook-calendar');
+            cal.innerHTML = '';
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            document.getElementById('daybook-month-title').innerText = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for(let i = 1; i <= daysInMonth; i++) {
+                let dStr = `${year}-${String(month+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                // Calculate total sales for this day
+                let dayBills = appData.bills.filter(b => b.date === dStr);
+                let dayTotal = dayBills.reduce((sum, b) => sum + b.total, 0);
+
+                cal.innerHTML += `
+                    <div class="cal-day" onclick="showDaybookDetails('${dStr}')">
+                        <div class="cal-date">${i}</div>
+                        <div class="cal-data" style="margin-top:10px;">
+                            <b>Bills: ${dayBills.length}</b><br>
+                            <b style="color:var(--primary)">Total: ₹${dayTotal}</b>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function showDaybookDetails(dateStr) {
+            const details = document.getElementById('daybook-details');
+            details.style.display = 'block';
+            let dayBills = appData.bills.filter(b => b.date === dateStr);
+            
+            if(dayBills.length === 0) {
+                details.innerHTML = `<h3>No Bills for ${dateStr}</h3>`;
+                return;
+            }
+
+            let html = `<h3>Bills for ${dateStr}</h3><table style="margin-top:10px;">
+                        <thead><tr><th>Bill No</th><th>Category</th><th>Total Amount</th></tr></thead><tbody>`;
+            
+            dayBills.forEach(b => {
+                html += `<tr><td>${b.id}</td><td>${b.category}</td><td>₹${b.total}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            details.innerHTML = html;
+        }
+
+        // --- STOCK EXCEL IMPORT (.xlsx) ---
+        function importStockExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(sheet, {header: 1}); 
+
+                let count = 0;
+                json.forEach(row => {
+                    if(!row || row.length < 2) return;
+                    let name = String(row[0] || '').trim();
+                    let price25 = parseFloat(row[1]) || 0;
+                    let price450 = parseFloat(row[2]) || 0;
+                    let unit = String(row[3] || 'nos').trim().toLowerCase();
+                    
+                    if(name && !name.includes("Under Group") && !name.includes("ItemName")) {
+                        let existing = appData.stock.find(s => s.name === name);
+                        if(existing) {
+                            existing.priceMain = price450 || existing.priceMain;
+                            existing.price25ml = price25 || existing.price25ml;
+                            existing.unit = unit || existing.unit;
+                        } else {
+                            appData.stock.push({
+                                name: name, qty: 0, unit: unit,
+                                priceMain: price450, price25ml: price25,
+                                extraMl: (unit === 'btl' || price25 > 0) ? 30 : 0,
+                                overEntry: 0
+                            });
+                        }
+                        count++;
+                    }
+                });
+                saveData();
+                renderStock();
+                alert(`Successfully imported ${count} items from Excel.`);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function renderStock() {
+            const tbody = document.getElementById('stock-tbody');
+            tbody.innerHTML = '';
+            appData.stock.forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><input type="text" value="${item.name}" onchange="appData.stock[${index}].name=this.value"></td>
+                        <td><input type="number" value="${item.qty}" onchange="appData.stock[${index}].qty=parseFloat(this.value)||0"></td>
+                        <td>
+                            <select onchange="appData.stock[${index}].unit=this.value">
+                                <option value="nos" ${item.unit==='nos'?'selected':''}>nos</option>
+                                <option value="btl" ${item.unit==='btl'?'selected':''}>btl</option>
+                                <option value="ml" ${item.unit==='ml'?'selected':''}>ml</option>
+                            </select>
+                        </td>
+                        <td><input type="number" step="0.01" value="${item.priceMain}" onchange="appData.stock[${index}].priceMain=parseFloat(this.value)||0"></td>
+                        <td><input type="number" step="0.01" value="${item.price25ml}" onchange="appData.stock[${index}].price25ml=parseFloat(this.value)||0"></td>
+                        <td class="extra-ml-col hidden"><input type="number" value="${item.extraMl}" onchange="appData.stock[${index}].extraMl=parseFloat(this.value)||0"></td>
+                        <td><input type="number" class="${item.overEntry>0?'red-text':''}" value="${item.overEntry}" onchange="appData.stock[${index}].overEntry=parseFloat(this.value)||0"></td>
+                        <td><button onclick="deleteStock(${index})" style="background:var(--danger)">X</button></td>
+                    </tr>`;
+            });
+        }
+
+        function toggleExtraMl() { document.querySelectorAll('.extra-ml-col').forEach(el => el.classList.toggle('hidden')); }
+        function saveStock() { saveData(); alert('Stock saved!'); }
+        function deleteStock(idx) { if(confirm('Delete?')){ appData.stock.splice(idx, 1); saveData(); renderStock(); } }
+
+        // --- TALLY SUMMARY & UTILS ---
+        function renderTallySummary() {
+            const tbody = document.getElementById('tally-tbody');
+            tbody.innerHTML = '';
+            for (const [name, qty] of Object.entries(appData.tallySummary)) {
+                if(qty > 0) {
+                    tbody.innerHTML += `<tr><td>${name}</td><td>${qty.toFixed(2)}</td>
+                        <td><button onclick="reduceTally('${name}')">Reduce Qty</button></td></tr>`;
+                }
+            }
+        }
+
+        function reduceTally(name) {
+            let amt = prompt(`Reduce quantity for ${name}:`, "0");
+            if(amt && !isNaN(amt)) {
+                appData.tallySummary[name] -= parseFloat(amt);
+                if(appData.tallySummary[name] <= 0) delete appData.tallySummary[name];
+                saveData(); renderTallySummary();
+            }
+        }
+
+        function sortTally(type) {
+            let arr = Object.entries(appData.tallySummary);
+            if(type === 'name') arr.sort((a,b) => a[0].localeCompare(b[0]));
+            if(type === 'qty') arr.sort((a,b) => b[1] - a[1]);
+            
+            const tbody = document.getElementById('tally-tbody');
+            tbody.innerHTML = '';
+            arr.forEach(([name, qty]) => {
+                if(qty > 0) tbody.innerHTML += `<tr><td>${name}</td><td>${qty.toFixed(2)}</td><td><button onclick="reduceTally('${name}')">Reduce</button></td></tr>`;
+            });
+        }
+
+        // --- BACKUP ---
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "svcn_master_backup.json");
+            dlAnchorElem.click();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    appData = JSON.parse(e.target.result);
+                    saveData(); alert("Data restored!"); window.location.reload();
+                } catch(err) { alert("Invalid file."); }
+            };
+            if(file) reader.readAsText(file);
+        }
+
+        // INIT
+        if(appData.bills.length === 0) createNewBill();
+        
+    </script>
+
+</body></html>
